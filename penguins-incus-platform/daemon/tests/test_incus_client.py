@@ -1,7 +1,7 @@
 """Tests for IncusClient multi-remote management (no live Incus required)."""
 
 import pytest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import penguins_incus.incus.client as _mod
 from penguins_incus.incus.client import IncusClient
@@ -42,7 +42,9 @@ def test_set_remote_unknown_raises() -> None:
 
 def test_remove_remote_unregisters() -> None:
     client = make_client()
-    with patch.object(_mod, "_RemoteConnection", return_value=MagicMock()):
+    mock_conn = MagicMock()
+    mock_conn.aclose = AsyncMock()
+    with patch.object(_mod, "_RemoteConnection", return_value=mock_conn):
         client.add_remote("staging", url="https://staging.example.com")
     client.remove_remote("staging")
     assert "staging" not in client.list_remote_names()
@@ -56,7 +58,9 @@ def test_remove_local_raises() -> None:
 
 def test_remove_active_remote_falls_back_to_local() -> None:
     client = make_client()
-    with patch.object(_mod, "_RemoteConnection", return_value=MagicMock()):
+    mock_conn = MagicMock()
+    mock_conn.aclose = AsyncMock()
+    with patch.object(_mod, "_RemoteConnection", return_value=mock_conn):
         client.add_remote("temp", url="https://temp.example.com")
     client.set_remote("temp")
     client.remove_remote("temp")
