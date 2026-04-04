@@ -7,7 +7,8 @@ from fastapi import APIRouter, Request
 from ...profiles.library import list_presets
 
 router = APIRouter(tags=["profiles"])
-def _incus(req: Request): return req.app.state.incus  # type: ignore[return]
+def _incus(req: Request) -> Any:
+    return req.app.state.incus
 
 @router.get("/profiles")
 async def list_profiles(req: Request, project: str = "", remote: str = "") -> Any:
