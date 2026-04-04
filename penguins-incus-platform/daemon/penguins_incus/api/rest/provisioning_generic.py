@@ -11,7 +11,7 @@ from ...provisioning import generic as g
 router = APIRouter(tags=["provisioning/generic"])
 
 
-def _incus(req: Request) -> Any:  # type: ignore[return]
+def _incus(req: Request) -> Any:
     return req.app.state.incus
 
 
