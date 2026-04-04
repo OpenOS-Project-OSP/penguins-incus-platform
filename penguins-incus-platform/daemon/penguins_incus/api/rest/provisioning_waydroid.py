@@ -11,7 +11,7 @@ from ...provisioning import waydroid as w
 router = APIRouter(tags=["provisioning/waydroid"])
 
 
-def _incus(req: Request) -> Any:  # type: ignore[return]
+def _incus(req: Request) -> Any:
     return req.app.state.incus
 
 
