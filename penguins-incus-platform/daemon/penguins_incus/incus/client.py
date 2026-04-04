@@ -156,7 +156,10 @@ class IncusClient:
             params["project"] = project
         if type_filter:
             params["type"] = type_filter
-        return cast(Any, await conn.request("GET", "/1.0/instances", params=params))
+        return cast(
+            list[dict[str, Any]],
+            await conn.request("GET", "/1.0/instances", params=params),
+        )
 
     async def get_instance(self, name: str, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
@@ -212,7 +215,7 @@ class IncusClient:
     async def create_snapshot(self, name: str, snapshot: str,
                                stateful: bool = False, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return cast(list[dict[str, Any]], await self.post(
+        return cast(dict[str, Any], await self.post(
             f"/1.0/instances/{name}/snapshots",
             json={"name": snapshot, "stateful": stateful},
             params=params,
@@ -221,7 +224,7 @@ class IncusClient:
     async def restore_snapshot(self, name: str, snapshot: str,
                                 project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return cast(list[dict[str, Any]], await self.post(
+        return cast(dict[str, Any], await self.post(
             f"/1.0/instances/{name}/snapshots/{snapshot}",
             json={"restore": snapshot}, params=params,
         ))
@@ -229,7 +232,7 @@ class IncusClient:
     async def delete_snapshot(self, name: str, snapshot: str,
                                project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return cast(list[dict[str, Any]], await self.delete(
+        return cast(dict[str, Any], await self.delete(
             f"/1.0/instances/{name}/snapshots/{snapshot}", params=params
         ))
 
@@ -283,7 +286,7 @@ class IncusClient:
         if project:
             params["project"] = project
         return cast(
-            dict[str, Any],
+            list[dict[str, Any]],
             await self.get(f"/1.0/storage-pools/{pool}/volumes", params=params),
         )
 
@@ -313,7 +316,7 @@ class IncusClient:
         }
         if alias:
             payload["aliases"] = [{"name": alias}]
-        return cast(list[dict[str, Any]], await self.post("/1.0/images", json=payload))
+        return cast(dict[str, Any], await self.post("/1.0/images", json=payload))
 
     async def get_image(self, fingerprint: str) -> dict[str, Any]:
         return cast(dict[str, Any], await self.get(f"/1.0/images/{fingerprint}"))
@@ -422,7 +425,7 @@ class IncusClient:
     async def list_devices(self, name: str, project: str = "") -> dict[str, Any]:
         """Return the devices dict for an instance."""
         inst = await self.get_instance(name, project=project)
-        return inst.get("devices", {})
+        return cast(dict[str, Any], inst.get("devices", {}))
 
     async def add_device(self, name: str, device_name: str,
                          config: dict[str, Any], project: str = "") -> dict[str, Any]:
