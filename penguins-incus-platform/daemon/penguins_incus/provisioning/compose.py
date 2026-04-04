@@ -8,9 +8,9 @@ service that watches docker-compose.yml for changes and reloads automatically.
 from __future__ import annotations
 
 import textwrap
-from typing import Any
+from typing import Any, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 async def deploy_compose(incus: Any, config: dict[str, Any]) -> dict[str, Any]:
@@ -106,7 +106,7 @@ def convert_compose(compose_yaml: str) -> dict[str, Any]:
       - environment → container config keys
     """
     try:
-        doc = yaml.safe_load(compose_yaml)
+        doc = cast(dict[str, object], yaml.safe_load(compose_yaml))
     except yaml.YAMLError as exc:
         return {"error": str(exc)}
 
