@@ -4,6 +4,19 @@ Unified [Incus](https://linuxcontainers.org/incus/) container and VM management
 with full feature parity across three frontends: a Qt6/QML desktop app, a React
 web UI, and a CLI.
 
+KIM is also the central control plane for four guest-type toolkits that were
+previously maintained as separate projects:
+
+| Source project | Guest type | KIM integration |
+|---|---|---|
+| [incusbox](https://github.com/Interested-Deving-1896/incusbox) | Generic Linux containers | `kim provision generic` |
+| [waydroid-toolkit](https://github.com/Interested-Deving-1896/waydroid-toolkit) | Waydroid (Android) containers | `kim provision waydroid` |
+| [Incus-MacOS-Toolkit](https://github.com/Interested-Deving-1896/Incus-MacOS-Toolkit) | macOS KVM VMs | `kim provision macos` |
+| [incus-windows-toolkit](https://github.com/Interested-Deving-1896/incus-windows-toolkit) | Windows VMs | `kim provision windows` |
+
+All four toolkits are now daemon plugins — their logic runs inside `kim-daemon`
+and is exposed through the same REST/D-Bus API used by the GUI frontends.
+
 ## Architecture
 
 ```
@@ -46,13 +59,32 @@ kapsule-incus-manager/
 │       ├── resources.py        # CPU/memory/disk polling (diff-based %)
 │       ├── incus/client.py     # Async Incus REST client, multi-remote pool
 │       ├── api/rest/           # FastAPI routers (one per resource type)
+│       │   ├── provisioning_generic.py   # incusbox routes
+│       │   ├── provisioning_waydroid.py  # waydroid-toolkit routes
+│       │   ├── provisioning_macos.py     # Incus-MacOS-Toolkit routes
+│       │   └── provisioning_windows.py   # incus-windows-toolkit routes
 │       ├── api/dbus/service.py # D-Bus service
-│       ├── profiles/library.py # Built-in profile presets
-│       └── provisioning/       # Docker Compose → Incus converter
+│       ├── profiles/library.py # Profile preset loader
+│       └── provisioning/       # Guest-type provisioning plugins
+│           ├── _base.py        # Shared helpers (cloud-init, device builders)
+│           ├── compose.py      # Docker Compose → Incus converter
+│           ├── generic.py      # incusbox feature set
+│           ├── waydroid.py     # waydroid-toolkit feature set
+│           ├── macos.py        # Incus-MacOS-Toolkit feature set
+│           └── windows.py      # incus-windows-toolkit feature set
 ├── cli/                        # Python CLI (Click + httpx + rich)
 │   └── kim/cli/
 │       ├── main.py             # All command groups
-│       └── client.py           # DaemonClient HTTP wrapper
+│       ├── client.py           # DaemonClient HTTP wrapper
+│       ├── provision_generic.py
+│       ├── provision_waydroid.py
+│       ├── provision_macos.py
+│       └── provision_windows.py
+├── profiles/                   # Bundled Incus profile presets
+│   ├── generic/                # incusbox profiles (base, gui, init, nvidia, …)
+│   ├── macos/                  # macOS KVM profile
+│   ├── windows/                # Windows VM profiles (desktop, server, GPU overlays)
+│   └── waydroid/               # Waydroid container profile
 ├── ui-web/                     # React/TypeScript web UI (Vite)
 │   └── src/
 │       ├── api/client.ts       # Typed API client
@@ -180,8 +212,52 @@ kim project    list / create / delete
 kim cluster    list / evacuate / restore / remove
 kim remote     list / add / activate / remove
 kim operation  list / cancel
-kim provision  convert / deploy
 kim events
+
+kim provision convert / deploy                 # Docker Compose
+
+kim provision generic create                   # incusbox: create container
+kim provision generic assemble                 # incusbox: post-create setup
+kim provision generic gpu  attach/detach/list/list-host
+kim provision generic usb  attach/detach/list/list-host
+kim provision generic net  forward/unforward/list
+kim provision generic snapshot  create/restore/delete/list/schedule/schedule-disable
+kim provision generic fleet  list/start/stop
+kim provision generic publish
+
+kim provision waydroid create                  # Waydroid: provision container
+kim provision waydroid extensions  install/remove/list
+kim provision waydroid backup  create/restore/list
+kim provision waydroid cloud-sync
+kim provision waydroid gpu  attach/detach
+kim provision waydroid fleet  list
+kim provision waydroid publish
+
+kim provision macos image  firmware/fetch      # macOS: image management
+kim provision macos create                     # macOS: create VM
+kim provision macos start / stop
+kim provision macos snapshot  create/restore/delete/list/schedule
+kim provision macos backup  create/restore/list
+kim provision macos gpu  attach/detach
+kim provision macos net  forward/unforward
+kim provision macos disk-resize
+kim provision macos fleet  list/start/stop
+kim provision macos publish
+
+kim provision windows create                   # Windows: create VM
+kim provision windows start / stop
+kim provision windows snapshot  create/restore/delete/list/schedule
+kim provision windows backup  create/restore/list
+kim provision windows gpu  attach/detach
+kim provision windows net  forward/unforward
+kim provision windows guest-tools
+kim provision windows remoteapp  discover/launch
+kim provision windows apps
+kim provision windows cloud-sync
+kim provision windows harden
+kim provision windows disk-resize
+kim provision windows fleet  list/start/stop
+kim provision windows publish
 ```
 
 ## API
@@ -202,6 +278,22 @@ Key endpoints:
 | `WS` | `/api/v1/instances/{name}/console/ws` | Serial or VGA console |
 | `GET` | `/api/v1/events` | SSE event stream |
 | `POST` | `/api/v1/provisioning/compose` | Deploy from Docker Compose YAML |
+| `POST` | `/api/v1/provisioning/generic` | Create incusbox-style container |
+| `POST` | `/api/v1/provisioning/generic/{name}/assemble` | Post-create assembly |
+| `GET/POST/DELETE` | `/api/v1/provisioning/generic/{name}/gpus` | GPU passthrough |
+| `GET/POST/DELETE` | `/api/v1/provisioning/generic/{name}/usb` | USB passthrough |
+| `GET/POST/DELETE` | `/api/v1/provisioning/generic/{name}/forwards` | Port forwarding |
+| `POST` | `/api/v1/provisioning/waydroid` | Provision Waydroid container |
+| `GET/POST/DELETE` | `/api/v1/provisioning/waydroid/{name}/extensions` | Waydroid extensions |
+| `GET/POST` | `/api/v1/provisioning/waydroid/{name}/backups` | Waydroid backups |
+| `POST` | `/api/v1/provisioning/macos/image/fetch` | Download macOS recovery image |
+| `POST` | `/api/v1/provisioning/macos/image/firmware` | Download OVMF + OpenCore |
+| `POST` | `/api/v1/provisioning/macos` | Create macOS VM |
+| `POST` | `/api/v1/provisioning/windows` | Create Windows VM |
+| `POST` | `/api/v1/provisioning/windows/{name}/guest-tools` | Install guest tools |
+| `GET/POST` | `/api/v1/provisioning/windows/{name}/remoteapp` | Windows RemoteApp |
+| `POST` | `/api/v1/provisioning/windows/{name}/apps` | Install apps via winget |
+| `POST` | `/api/v1/provisioning/windows/{name}/harden` | Security hardening |
 
 ## Multi-remote support
 
@@ -247,7 +339,8 @@ cd ui-web && npm run typecheck && npm run lint
 ### CI
 
 GitHub Actions runs on every push to `main` and `feat/**` branches:
-- Python: ruff, mypy, pytest (daemon + CLI)
+- Python: ruff, mypy, pytest (daemon + CLI) — includes provisioning plugin tests
+- Profile YAML: validates all files under `profiles/` parse correctly
 - TypeScript: tsc, eslint, vitest, vite build
 - C++/QML: cmake configure + ninja build
 

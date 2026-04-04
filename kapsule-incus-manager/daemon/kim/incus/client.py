@@ -389,3 +389,119 @@ class IncusClient:
     async def aclose(self) -> None:
         for conn in self._remotes.values():
             await conn.aclose()
+
+    # ── Host resources ────────────────────────────────────────────────────
+
+    async def get_host_resources(self) -> dict[str, Any]:
+        """Return host hardware resources (CPU, memory, GPU, USB, storage)."""
+        return await self.get("/1.0/resources")  # type: ignore[return-value]
+
+    # ── Instance devices ──────────────────────────────────────────────────
+
+    async def list_devices(self, name: str, project: str = "") -> dict[str, Any]:
+        """Return the devices dict for an instance."""
+        inst = await self.get_instance(name, project=project)
+        return inst.get("devices", {})
+
+    async def add_device(self, name: str, device_name: str,
+                         config: dict[str, Any], project: str = "") -> dict[str, Any]:
+        """Add or replace a device on a running or stopped instance."""
+        inst = await self.get_instance(name, project=project)
+        devices: dict[str, Any] = dict(inst.get("devices", {}))
+        devices[device_name] = config
+        params = {"project": project} if project else {}
+        return await self.put(  # type: ignore[return-value]
+            f"/1.0/instances/{name}",
+            json={**inst, "devices": devices},
+            params=params,
+        )
+
+    async def remove_device(self, name: str, device_name: str,
+                             project: str = "") -> dict[str, Any]:
+        """Remove a device from an instance."""
+        inst = await self.get_instance(name, project=project)
+        devices: dict[str, Any] = dict(inst.get("devices", {}))
+        devices.pop(device_name, None)
+        params = {"project": project} if project else {}
+        return await self.put(  # type: ignore[return-value]
+            f"/1.0/instances/{name}",
+            json={**inst, "devices": devices},
+            params=params,
+        )
+
+    # ── Instance exec ─────────────────────────────────────────────────────
+
+    async def exec_instance(
+        self,
+        name: str,
+        command: list[str],
+        environment: dict[str, str] | None = None,
+        wait_for_websocket: bool = False,
+        interactive: bool = False,
+        project: str = "",
+    ) -> dict[str, Any]:
+        """Execute a command inside an instance (non-interactive by default).
+
+        Returns the operation metadata. For non-interactive exec the return
+        value includes ``return`` (exit code) once the operation completes.
+        """
+        params = {"project": project} if project else {}
+        payload: dict[str, Any] = {
+            "command": command,
+            "wait-for-websocket": wait_for_websocket,
+            "interactive": interactive,
+            "environment": environment or {},
+        }
+        return await self.post(  # type: ignore[return-value]
+            f"/1.0/instances/{name}/exec",
+            json=payload,
+            params=params,
+        )
+
+    # ── File push / pull ──────────────────────────────────────────────────
+
+    async def push_file(
+        self,
+        name: str,
+        path: str,
+        content: bytes | str,
+        uid: int = 0,
+        gid: int = 0,
+        mode: str = "0644",
+        project: str = "",
+    ) -> None:
+        """Write *content* to *path* inside the instance."""
+        if isinstance(content, str):
+            content = content.encode()
+        params: dict[str, Any] = {
+            "path": path,
+            **({"project": project} if project else {}),
+        }
+        headers = {
+            "X-Incus-uid": str(uid),
+            "X-Incus-gid": str(gid),
+            "X-Incus-mode": mode,
+            "X-Incus-type": "file",
+            "Content-Type": "application/octet-stream",
+        }
+        resp = await self._http.post(
+            f"/1.0/instances/{name}/files",
+            params=params,
+            headers=headers,
+            content=content,
+        )
+        resp.raise_for_status()
+
+    async def pull_file(self, name: str, path: str,
+                        project: str = "") -> bytes:
+        """Read a file from inside the instance."""
+        params: dict[str, Any] = {
+            "path": path,
+            **({"project": project} if project else {}),
+        }
+        resp = await self._http.get(
+            f"/1.0/instances/{name}/files",
+            params=params,
+        )
+        resp.raise_for_status()
+        return resp.content

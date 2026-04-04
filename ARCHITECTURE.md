@@ -7,6 +7,18 @@ consisting of three first-class frontends (QML desktop UI, web UI, CLI) backed
 by a single daemon. All frontends have full feature parity — every operation
 available in one is available in all others.
 
+KIM is also the central control plane for four guest-type toolkits that were
+previously maintained as separate projects. Their provisioning logic now runs
+inside `kim-daemon` as plugins, exposed through the same REST/D-Bus API used
+by the GUI frontends:
+
+| Source project | Guest type | Daemon plugin | CLI entry point |
+|---|---|---|---|
+| incusbox | Generic Linux containers | `provisioning/generic.py` | `kim provision generic` |
+| waydroid-toolkit | Waydroid (Android) containers | `provisioning/waydroid.py` | `kim provision waydroid` |
+| Incus-MacOS-Toolkit | macOS KVM VMs | `provisioning/macos.py` | `kim provision macos` |
+| incus-windows-toolkit | Windows VMs | `provisioning/windows.py` | `kim provision windows` |
+
 ## Design Principles
 
 1. **Daemon is the control plane.** No frontend contains business logic,
@@ -47,11 +59,21 @@ kapsule-incus-manager/
 │   ├── pyproject.toml
 │   ├── kim/
 │   │   ├── main.py               entry point, service wiring
-│   │   ├── incus/                Incus REST API client
+│   │   ├── incus/                Incus REST API client (multi-remote, exec, file push)
 │   │   ├── api/
 │   │   │   ├── rest/             FastAPI HTTP + WebSocket + SSE server
+│   │   │   │   ├── provisioning_generic.py   incusbox routes
+│   │   │   │   ├── provisioning_waydroid.py  waydroid-toolkit routes
+│   │   │   │   ├── provisioning_macos.py     Incus-MacOS-Toolkit routes
+│   │   │   │   └── provisioning_windows.py   incus-windows-toolkit routes
 │   │   │   └── dbus/             D-Bus service (dasbus)
-│   │   ├── provisioning/         app container + compose deployment logic
+│   │   ├── provisioning/         guest-type provisioning plugins
+│   │   │   ├── _base.py          shared helpers (cloud-init, device builders)
+│   │   │   ├── compose.py        Docker Compose → Incus converter
+│   │   │   ├── generic.py        incusbox feature set
+│   │   │   ├── waydroid.py       waydroid-toolkit feature set
+│   │   │   ├── macos.py          Incus-MacOS-Toolkit feature set
+│   │   │   └── windows.py        incus-windows-toolkit feature set
 │   │   ├── profiles/             bundled Incus profile library loader
 │   │   └── events.py             Incus event subscriber + fan-out
 │   └── data/
@@ -76,14 +98,22 @@ kapsule-incus-manager/
 │   ├── pyproject.toml
 │   └── kim/
 │       └── cli/
-│           └── main.py           Click-based CLI, generated from OpenAPI schema
+│           ├── main.py               Click-based CLI, generated from OpenAPI schema
+│           ├── provision_generic.py  incusbox CLI subcommands
+│           ├── provision_waydroid.py waydroid-toolkit CLI subcommands
+│           ├── provision_macos.py    Incus-MacOS-Toolkit CLI subcommands
+│           └── provision_windows.py  incus-windows-toolkit CLI subcommands
 │
 ├── profiles/                     Incus profile YAML library
 │   ├── gpu/
 │   ├── audio/
 │   ├── display/
 │   ├── rocm/
-│   └── nesting/
+│   ├── nesting/
+│   ├── generic/                  incusbox profiles (base, gui, init, nvidia, rootless, …)
+│   ├── macos/                    macOS KVM profile (OVMF, Q35, ignore_msrs)
+│   ├── windows/                  Windows VM profiles (desktop, server, GPU overlays)
+│   └── waydroid/                 Waydroid container profile (binder, ashmem, ADB proxy)
 │
 └── .devcontainer/
     └── devcontainer.json
@@ -224,6 +254,16 @@ are in scope:
   auto-reload on config change
 - **Operations**: live log, cancel
 - **Events**: real-time stream, filterable by type
+- **Generic containers** (incusbox): create with cloud-init user setup, assemble
+  (post-create packages + hooks), GPU/USB passthrough, port forwarding, snapshots,
+  backups, fleet operations, publish
+- **Waydroid containers**: provision with binder/ashmem setup, extension management
+  (GApps, MicroG, Magisk, …), backup/restore, cloud sync, GPU passthrough, fleet
+- **macOS VMs**: firmware/image download, VM creation with OVMF + OpenCore volumes,
+  GPU passthrough, port forwarding, snapshots, backups, disk resize, fleet
+- **Windows VMs**: VM creation from profile + ISO, guest tools, RemoteApp, winget
+  app install, GPU passthrough, port forwarding, snapshots, backups, cloud sync,
+  security hardening, disk resize, fleet
 
 ---
 
@@ -238,6 +278,41 @@ are in scope:
 | incus-app-container | Logic | App container provisioning, VLAN management, config schema |
 | incus-compose | Reference | docker-compose → incus YAML mapping schema |
 | nodegui | Dropped | Replaced by Qt6/QML |
+| **incusbox** | **Merged** | **Generic container provisioning plugin + profiles** |
+| **waydroid-toolkit** | **Merged** | **Waydroid provisioning plugin + Waydroid profile** |
+| **Incus-MacOS-Toolkit** | **Merged** | **macOS VM provisioning plugin + macos-kvm profile** |
+| **incus-windows-toolkit** | **Merged** | **Windows VM provisioning plugin + Windows profiles** |
+
+### Provisioning plugin architecture
+
+Each merged toolkit becomes a **provisioning plugin** — a Python module under
+`daemon/kim/provisioning/` with a matching REST router under
+`daemon/kim/api/rest/`. The plugin pattern follows the existing `compose.py`
+plugin.
+
+```
+daemon/kim/provisioning/
+  _base.py      shared helpers: cloud-init builder, device config builders
+  compose.py    Docker Compose → Incus (existing)
+  generic.py    incusbox: container create/assemble/gpu/usb/net/snapshot/fleet
+  waydroid.py   waydroid-toolkit: container create/extensions/backup/gpu/fleet
+  macos.py      Incus-MacOS-Toolkit: image/firmware/vm-create/snapshot/fleet
+  windows.py    incus-windows-toolkit: vm-create/guest-tools/remoteapp/harden/fleet
+```
+
+**Key constraint**: plugins call `IncusClient` methods only — they never shell
+out to `incus` CLI or any external tool. Operations that require running
+commands inside a guest use `IncusClient.exec_instance()`. Operations that
+require host-side downloads use a temporary helper container.
+
+**IncusClient extensions** added to support the plugins:
+- `exec_instance(name, command, environment)` — run command inside instance
+- `push_file(name, path, content)` — write file into instance
+- `pull_file(name, path)` — read file from instance
+- `list_devices(name)` — get instance device dict
+- `add_device(name, dev_name, config)` — add/replace device on instance
+- `remove_device(name, dev_name)` — remove device from instance
+- `get_host_resources()` — enumerate host GPU/USB hardware
 
 ---
 
@@ -256,9 +331,13 @@ are in scope:
 
 ## Non-Goals
 
-- Windows or macOS support (Incus is Linux-only)
+- Windows or macOS *host* support (Incus is Linux-only; Windows/macOS *guests*
+  are fully supported via the provisioning plugins)
 - Managing non-Incus container runtimes (Docker, Podman) directly — only via
   app containers running inside Incus
 - A mobile UI
 - Replacing the `incus` CLI for scripting — the KIM CLI is a management
   companion, not a replacement for the upstream tool
+- Maintaining the four source toolkits (incusbox, waydroid-toolkit,
+  Incus-MacOS-Toolkit, incus-windows-toolkit) as independent projects — KIM is
+  now the canonical location for all of their functionality

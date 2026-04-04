@@ -11,7 +11,7 @@ from typing import Any
 
 import yaml
 
-_PROFILES_DIR = pathlib.Path(__file__).parents[5] / "profiles"
+_PROFILES_DIR = pathlib.Path(__file__).parents[3] / "profiles"
 
 # Inline fallback presets — used when the profiles/ directory is not present
 _BUILTIN_PRESETS: list[dict[str, Any]] = [
@@ -123,6 +123,10 @@ def list_presets() -> list[dict[str, Any]]:
         for yaml_file in sorted(category_dir.glob("*.yaml")):
             try:
                 data = yaml.safe_load(yaml_file.read_text())
+                # Ensure the profile dict always has a 'name' field so
+                # consumers can use it without checking for its presence.
+                if "name" not in data:
+                    data["name"] = yaml_file.stem
                 presets.append({
                     "name": yaml_file.stem,
                     "description": data.get("description", ""),

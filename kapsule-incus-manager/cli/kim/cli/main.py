@@ -7,6 +7,10 @@ from typing import Any
 
 import click
 from .client import DaemonClient
+from .provision_generic import generic
+from .provision_waydroid import waydroid
+from .provision_macos import macos
+from .provision_windows import windows
 
 
 @click.group()
@@ -731,9 +735,10 @@ def operation_cancel(ctx: click.Context, id: str) -> None:
 
 @cli.group()
 def provision() -> None:
-    """Compose-based provisioning."""
+    """Provision containers and VMs (compose, generic, waydroid, macos, windows)."""
 
 
+# Compose sub-commands (existing)
 @provision.command("convert")
 @click.argument("compose_file", type=click.Path(exists=True, dir_okay=False))
 @click.pass_context
@@ -755,6 +760,13 @@ def provision_deploy(ctx: click.Context, compose_file: str, project: str) -> Non
         compose_yaml = f.read()
     ctx.obj["client"].post("/api/v1/provisioning/compose",
                            json={"compose": compose_yaml, "project": project})
+
+
+# Guest-type provisioning sub-groups
+provision.add_command(generic)
+provision.add_command(waydroid)
+provision.add_command(macos)
+provision.add_command(windows)
 
 
 # ── Events ────────────────────────────────────────────────────────────────────

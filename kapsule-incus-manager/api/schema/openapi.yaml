@@ -36,6 +36,14 @@ tags:
     description: Real-time event stream
   - name: provisioning
     description: App container and Compose deployment
+  - name: provisioning/generic
+    description: Generic container provisioning (incusbox feature set)
+  - name: provisioning/waydroid
+    description: Waydroid Android container provisioning
+  - name: provisioning/macos
+    description: macOS VM provisioning
+  - name: provisioning/windows
+    description: Windows VM provisioning
 
 # ── Reusable components ───────────────────────────────────────────────────────
 components:
@@ -1220,3 +1228,1429 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+
+  # ── Generic container provisioning (incusbox) ─────────────────────────────
+
+  /api/v1/provisioning/generic:
+    post:
+      operationId: createGenericContainer
+      summary: Create an incusbox-style container
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:                { type: string }
+                image:               { type: string, default: "images:ubuntu/24.04/cloud" }
+                hostname:            { type: string }
+                user_name:           { type: string, default: "user" }
+                user_uid:            { type: integer, default: 1000 }
+                user_gid:            { type: integer, default: 1000 }
+                home:                { type: string }
+                additional_packages: { type: array, items: { type: string } }
+                init_hooks:          { type: array, items: { type: string } }
+                pre_init_hooks:      { type: array, items: { type: string } }
+                nvidia:              { type: boolean, default: false }
+                profiles:            { type: array, items: { type: string } }
+                disk_size:           { type: string, default: "20GB" }
+                volumes:             { type: array, items: { type: string } }
+                project:             { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/assemble:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: assembleGenericContainer
+      summary: Run post-create assembly (packages, hooks, shell integration)
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                packages:          { type: array, items: { type: string } }
+                hooks:             { type: array, items: { type: string } }
+                shell_integration: { type: boolean, default: true }
+                project:           { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/host/gpus:
+    get:
+      operationId: listHostGpus
+      summary: List GPUs available on the host
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: GPU list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+
+  /api/v1/provisioning/generic/host/usb:
+    get:
+      operationId: listHostUsb
+      summary: List USB devices available on the host
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: USB device list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+
+  /api/v1/provisioning/generic/{name}/gpus:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listInstanceGpus
+      summary: List GPU devices attached to a container
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: GPU devices
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: attachGpu
+      summary: Attach a GPU to a container
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dev_name: { type: string, default: "gpu0" }
+                gpu_type: { type: string, enum: [physical, mdev, mig, virtio], default: physical }
+                pci:      { type: string }
+                vendor:   { type: string }
+                gid:      { type: integer, default: 44 }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/gpus/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: detachGpu
+      summary: Detach a GPU from a container
+      tags: [provisioning/generic]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/usb:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listInstanceUsb
+      summary: List USB devices attached to a container
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: USB devices
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: attachUsb
+      summary: Attach a USB device to a container
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [vendor_id, product_id]
+              properties:
+                vendor_id:  { type: string }
+                product_id: { type: string }
+                dev_name:   { type: string, default: "usb0" }
+                project:    { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/usb/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: detachUsb
+      summary: Detach a USB device from a container
+      tags: [provisioning/generic]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/forwards:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listForwards
+      summary: List port-forward proxy devices on a container
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: Proxy devices
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: addForward
+      summary: Add a port-forward proxy device
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host_port, guest_port]
+              properties:
+                host_port:   { type: integer }
+                guest_port:  { type: integer }
+                protocol:    { type: string, default: "tcp" }
+                listen_addr: { type: string, default: "127.0.0.1" }
+                dev_name:    { type: string }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/forwards/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: removeForward
+      summary: Remove a port-forward proxy device
+      tags: [provisioning/generic]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/snapshots:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listGenericSnapshots
+      summary: List snapshots for a container
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: Snapshot list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+    post:
+      operationId: createGenericSnapshot
+      summary: Create a snapshot
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [snapshot]
+              properties:
+                snapshot: { type: string }
+                stateful: { type: boolean, default: false }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/snapshots/schedule:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setGenericSnapshotSchedule
+      summary: Set automatic snapshot schedule
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schedule]
+              properties:
+                schedule: { type: string }
+                expiry:   { type: string }
+                project:  { type: string, default: "" }
+      responses:
+        "200":
+          description: Schedule updated
+    delete:
+      operationId: disableGenericSnapshotSchedule
+      summary: Disable automatic snapshots
+      tags: [provisioning/generic]
+      responses:
+        "200":
+          description: Schedule disabled
+
+  /api/v1/provisioning/generic/{name}/snapshots/{snapshot}/restore:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: snapshot, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: restoreGenericSnapshot
+      summary: Restore a snapshot
+      tags: [provisioning/generic]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/{name}/snapshots/{snapshot}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: snapshot, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: deleteGenericSnapshot
+      summary: Delete a snapshot
+      tags: [provisioning/generic]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/fleet:
+    get:
+      operationId: listGenericFleet
+      summary: List all generic containers
+      tags: [provisioning/generic]
+      parameters:
+        - { name: project, in: query, schema: { type: string, default: "" } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Container list
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/InstanceSummary" } }
+
+  /api/v1/provisioning/generic/fleet/start:
+    post:
+      operationId: fleetStartGeneric
+      summary: Start multiple containers
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [names]
+              properties:
+                names:   { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/fleet/stop:
+    post:
+      operationId: fleetStopGeneric
+      summary: Stop multiple containers
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [names]
+              properties:
+                names:   { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/generic/publish:
+    post:
+      operationId: publishGenericContainer
+      summary: Publish a container as a reusable Incus image
+      tags: [provisioning/generic]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:        { type: string }
+                alias:       { type: string }
+                description: { type: string }
+                public:      { type: boolean, default: false }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+
+  # ── Waydroid container provisioning ──────────────────────────────────────
+
+  /api/v1/provisioning/waydroid:
+    post:
+      operationId: createWaydroidContainer
+      summary: Provision an Incus container with Waydroid pre-installed
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:        { type: string }
+                image:       { type: string, default: "images:ubuntu/22.04/cloud" }
+                image_type:  { type: string, enum: [VANILLA, GAPPS], default: VANILLA }
+                arch:        { type: string, enum: [x86_64, arm64], default: x86_64 }
+                gpu:         { type: boolean, default: false }
+                gpu_type:    { type: string, default: physical }
+                profiles:    { type: array, items: { type: string } }
+                disk_size:   { type: string, default: "40GB" }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/{name}/extensions:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listWaydroidExtensions
+      summary: List installed Waydroid extensions
+      tags: [provisioning/waydroid]
+      responses:
+        "200":
+          description: Extension list
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: installWaydroidExtension
+      summary: Install a Waydroid extension
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [extension]
+              properties:
+                extension: { type: string, enum: [gapps, microg, magisk, libhoudini, libndk, widevine, keymapper] }
+                project:   { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/{name}/extensions/{extension}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: extension, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: removeWaydroidExtension
+      summary: Remove a Waydroid extension
+      tags: [provisioning/waydroid]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/{name}/backups:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listWaydroidBackups
+      summary: List Waydroid backups inside the container
+      tags: [provisioning/waydroid]
+      responses:
+        "200":
+          description: Backup list
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+    post:
+      operationId: backupWaydroid
+      summary: Create a Waydroid data backup
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dest:    { type: string }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/{name}/restore:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: restoreWaydroid
+      summary: Restore a Waydroid backup
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [archive]
+              properties:
+                archive: { type: string }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/{name}/cloud-sync:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: configureWaydroidCloudSync
+      summary: Configure rclone cloud sync for Waydroid backups
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [remote_name, remote_path]
+              properties:
+                remote_name: { type: string }
+                remote_path: { type: string }
+                schedule:    { type: string }
+                project:     { type: string, default: "" }
+      responses:
+        "200":
+          description: Cloud sync configured
+
+  /api/v1/provisioning/waydroid/{name}/gpus:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: attachWaydroidGpu
+      summary: Attach a GPU to a Waydroid container
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dev_name: { type: string, default: "gpu0" }
+                gpu_type: { type: string, default: physical }
+                pci:      { type: string }
+                vendor:   { type: string }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/{name}/gpus/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: detachWaydroidGpu
+      summary: Detach a GPU from a Waydroid container
+      tags: [provisioning/waydroid]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/waydroid/fleet:
+    get:
+      operationId: listWaydroidFleet
+      summary: List Waydroid containers
+      tags: [provisioning/waydroid]
+      parameters:
+        - { name: project, in: query, schema: { type: string, default: "" } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: Container list
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/InstanceSummary" } }
+
+  /api/v1/provisioning/waydroid/publish:
+    post:
+      operationId: publishWaydroidContainer
+      summary: Publish a Waydroid container as a reusable Incus image
+      tags: [provisioning/waydroid]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:        { type: string }
+                alias:       { type: string }
+                description: { type: string }
+                public:      { type: boolean, default: false }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  # ── macOS VM provisioning ─────────────────────────────────────────────────
+
+  /api/v1/provisioning/macos/image/firmware:
+    post:
+      operationId: downloadMacosFirmware
+      summary: Download OVMF firmware and OpenCore via a helper container
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                storage_pool: { type: string, default: "default" }
+                project:      { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/image/fetch:
+    post:
+      operationId: fetchMacosImage
+      summary: Download macOS recovery image via a helper container
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version:      { type: string, default: "sonoma" }
+                storage_pool: { type: string, default: "default" }
+                volume_name:  { type: string }
+                project:      { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos:
+    post:
+      operationId: createMacosVm
+      summary: Create a macOS VM with storage volumes attached
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:          { type: string }
+                version:       { type: string, default: "sonoma" }
+                ram:           { type: string, default: "4GiB" }
+                cpus:          { type: integer, default: 4 }
+                storage_pool:  { type: string, default: "default" }
+                disk_vol:      { type: string }
+                installer_vol: { type: string }
+                opencore_vol:  { type: string }
+                profiles:      { type: array, items: { type: string } }
+                project:       { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/start:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: startMacosVm
+      summary: Start a macOS VM
+      tags: [provisioning/macos]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/stop:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: force, in: query, schema: { type: boolean, default: false } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: stopMacosVm
+      summary: Stop a macOS VM
+      tags: [provisioning/macos]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/snapshots:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listMacosSnapshots
+      summary: List snapshots for a macOS VM
+      tags: [provisioning/macos]
+      responses:
+        "200":
+          description: Snapshot list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+    post:
+      operationId: createMacosSnapshot
+      summary: Create a snapshot
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [snapshot]
+              properties:
+                snapshot: { type: string }
+                stateful: { type: boolean, default: false }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/snapshots/schedule:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setMacosSnapshotSchedule
+      summary: Set automatic snapshot schedule for a macOS VM
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schedule]
+              properties:
+                schedule: { type: string }
+                expiry:   { type: string }
+                project:  { type: string, default: "" }
+      responses:
+        "200":
+          description: Schedule updated
+
+  /api/v1/provisioning/macos/{name}/snapshots/{snapshot}/restore:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: snapshot, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: restoreMacosSnapshot
+      summary: Restore a macOS VM snapshot
+      tags: [provisioning/macos]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/snapshots/{snapshot}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: snapshot, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: deleteMacosSnapshot
+      summary: Delete a macOS VM snapshot
+      tags: [provisioning/macos]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/backups:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listMacosBackups
+      summary: List Incus backups for a macOS VM
+      tags: [provisioning/macos]
+      responses:
+        "200":
+          description: Backup list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+    post:
+      operationId: backupMacosVm
+      summary: Create an Incus backup of a macOS VM
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_name:       { type: string }
+                instance_only:     { type: boolean, default: false }
+                optimized_storage: { type: boolean, default: true }
+                project:           { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/restore:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: restoreMacosVmBackup
+      summary: Restore a macOS VM from an Incus backup
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backup_name]
+              properties:
+                backup_name: { type: string }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/gpus:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: attachMacosGpu
+      summary: Attach a GPU to a macOS VM
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dev_name: { type: string, default: "gpu0" }
+                gpu_type: { type: string, default: physical }
+                pci:      { type: string }
+                vendor:   { type: string }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/gpus/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: detachMacosGpu
+      summary: Detach a GPU from a macOS VM
+      tags: [provisioning/macos]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/forwards:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: addMacosForward
+      summary: Add a port-forward proxy device to a macOS VM
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host_port, guest_port]
+              properties:
+                host_port:   { type: integer }
+                guest_port:  { type: integer }
+                protocol:    { type: string, default: "tcp" }
+                listen_addr: { type: string, default: "127.0.0.1" }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/forwards/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: removeMacosForward
+      summary: Remove a port-forward proxy device from a macOS VM
+      tags: [provisioning/macos]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/{name}/disk/resize:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: resizeMacosDisk
+      summary: Resize the macOS VM disk volume
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_size]
+              properties:
+                new_size:     { type: string, example: "256G" }
+                storage_pool: { type: string, default: "default" }
+                volume_name:  { type: string }
+                project:      { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/fleet:
+    get:
+      operationId: listMacosFleet
+      summary: List macOS VMs
+      tags: [provisioning/macos]
+      parameters:
+        - { name: project, in: query, schema: { type: string, default: "" } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: VM list
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/InstanceSummary" } }
+
+  /api/v1/provisioning/macos/fleet/start:
+    post:
+      operationId: fleetStartMacos
+      summary: Start multiple macOS VMs
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [names]
+              properties:
+                names:   { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/fleet/stop:
+    post:
+      operationId: fleetStopMacos
+      summary: Stop multiple macOS VMs
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [names]
+              properties:
+                names:   { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/macos/publish:
+    post:
+      operationId: publishMacosVm
+      summary: Publish a macOS VM as a reusable Incus image
+      tags: [provisioning/macos]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:        { type: string }
+                alias:       { type: string }
+                description: { type: string }
+                public:      { type: boolean, default: false }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  # ── Windows VM provisioning ───────────────────────────────────────────────
+
+  /api/v1/provisioning/windows:
+    post:
+      operationId: createWindowsVm
+      summary: Create a Windows VM in Incus
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                name:          { type: string, default: "windows" }
+                profile:       { type: string, default: "windows-desktop" }
+                image:         { type: string, description: "Path to Windows ISO" }
+                disk:          { type: string, description: "Path to additional disk image" }
+                ram:           { type: string, default: "8GiB" }
+                cpus:          { type: integer, default: 4 }
+                disk_size:     { type: string, default: "64GB" }
+                gpu_overlay:   { type: string, description: "GPU overlay profile (vfio, looking-glass)" }
+                rdp:           { type: boolean, default: true }
+                boot_autostart: { type: boolean, default: false }
+                project:       { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/start:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: startWindowsVm
+      summary: Start a Windows VM
+      tags: [provisioning/windows]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/stop:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: force, in: query, schema: { type: boolean, default: false } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: stopWindowsVm
+      summary: Stop a Windows VM
+      tags: [provisioning/windows]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/snapshots:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listWindowsSnapshots
+      summary: List snapshots for a Windows VM
+      tags: [provisioning/windows]
+      responses:
+        "200":
+          description: Snapshot list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+    post:
+      operationId: createWindowsSnapshot
+      summary: Create a snapshot
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [snapshot]
+              properties:
+                snapshot: { type: string }
+                stateful: { type: boolean, default: false }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/snapshots/schedule:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: setWindowsSnapshotSchedule
+      summary: Set automatic snapshot schedule for a Windows VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [schedule]
+              properties:
+                schedule: { type: string }
+                expiry:   { type: string }
+                project:  { type: string, default: "" }
+      responses:
+        "200":
+          description: Schedule updated
+
+  /api/v1/provisioning/windows/{name}/snapshots/{snapshot}/restore:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: snapshot, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    post:
+      operationId: restoreWindowsSnapshot
+      summary: Restore a Windows VM snapshot
+      tags: [provisioning/windows]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/snapshots/{snapshot}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: snapshot, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: deleteWindowsSnapshot
+      summary: Delete a Windows VM snapshot
+      tags: [provisioning/windows]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/backups:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: listWindowsBackups
+      summary: List Incus backups for a Windows VM
+      tags: [provisioning/windows]
+      responses:
+        "200":
+          description: Backup list
+          content:
+            application/json:
+              schema: { type: array, items: { type: object, additionalProperties: true } }
+    post:
+      operationId: backupWindowsVm
+      summary: Create an Incus backup of a Windows VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                backup_name:       { type: string }
+                instance_only:     { type: boolean, default: false }
+                optimized_storage: { type: boolean, default: true }
+                project:           { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/restore:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: restoreWindowsVmBackup
+      summary: Restore a Windows VM from an Incus backup
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [backup_name]
+              properties:
+                backup_name: { type: string }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/gpus:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: attachWindowsGpu
+      summary: Attach a GPU to a Windows VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                dev_name: { type: string, default: "gpu0" }
+                gpu_type: { type: string, default: physical }
+                pci:      { type: string }
+                vendor:   { type: string }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/gpus/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: detachWindowsGpu
+      summary: Detach a GPU from a Windows VM
+      tags: [provisioning/windows]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/forwards:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: addWindowsForward
+      summary: Add a port-forward proxy device to a Windows VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [host_port, guest_port]
+              properties:
+                host_port:   { type: integer }
+                guest_port:  { type: integer }
+                protocol:    { type: string, default: "tcp" }
+                listen_addr: { type: string, default: "127.0.0.1" }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/forwards/{dev_name}:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: dev_name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    delete:
+      operationId: removeWindowsForward
+      summary: Remove a port-forward proxy device from a Windows VM
+      tags: [provisioning/windows]
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/guest-tools:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: installWindowsGuestTools
+      summary: Install Windows guest tools via PowerShell exec
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tools:   { type: array, items: { type: string, enum: [svcguest, serviceman, srvlib, winbtrfs, winfsp] } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/remoteapp:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+      - { name: project, in: query, schema: { type: string, default: "" } }
+    get:
+      operationId: discoverWindowsRemoteApps
+      summary: Discover installed Windows applications
+      tags: [provisioning/windows]
+      responses:
+        "200":
+          description: Application list
+          content:
+            application/json:
+              schema: { type: object, additionalProperties: true }
+
+  /api/v1/provisioning/windows/{name}/remoteapp/launch:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: launchWindowsRemoteApp
+      summary: Launch a Windows application inside the VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [app]
+              properties:
+                app:     { type: string }
+                args:    { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/apps:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: installWindowsApps
+      summary: Install Windows applications via winget
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [apps]
+              properties:
+                apps:    { type: array, items: { type: string }, description: "winget package IDs" }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/cloud-sync:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    put:
+      operationId: configureWindowsCloudSync
+      summary: Configure rclone cloud sync for Windows VM backups
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [remote_name, remote_path]
+              properties:
+                remote_name: { type: string }
+                remote_path: { type: string }
+                schedule:    { type: string }
+                project:     { type: string, default: "" }
+      responses:
+        "200":
+          description: Cloud sync configured
+
+  /api/v1/provisioning/windows/{name}/harden:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: hardenWindowsVm
+      summary: Apply security hardening to a Windows VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                level:   { type: string, enum: [basic, standard, strict], default: standard }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/{name}/disk/resize:
+    parameters:
+      - { name: name, in: path, required: true, schema: { type: string } }
+    post:
+      operationId: resizeWindowsDisk
+      summary: Resize the root disk of a Windows VM
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [new_size]
+              properties:
+                new_size: { type: string, example: "128GB" }
+                project:  { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/fleet:
+    get:
+      operationId: listWindowsFleet
+      summary: List Windows VMs
+      tags: [provisioning/windows]
+      parameters:
+        - { name: project, in: query, schema: { type: string, default: "" } }
+        - { name: status, in: query, schema: { type: string } }
+      responses:
+        "200":
+          description: VM list
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: "#/components/schemas/InstanceSummary" } }
+
+  /api/v1/provisioning/windows/fleet/start:
+    post:
+      operationId: fleetStartWindows
+      summary: Start multiple Windows VMs
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [names]
+              properties:
+                names:   { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/fleet/stop:
+    post:
+      operationId: fleetStopWindows
+      summary: Stop multiple Windows VMs
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [names]
+              properties:
+                names:   { type: array, items: { type: string } }
+                project: { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }
+
+  /api/v1/provisioning/windows/publish:
+    post:
+      operationId: publishWindowsVm
+      summary: Publish a Windows VM as a reusable Incus image
+      tags: [provisioning/windows]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:        { type: string }
+                alias:       { type: string }
+                description: { type: string }
+                public:      { type: boolean, default: false }
+                project:     { type: string, default: "" }
+      responses:
+        "202": { $ref: "#/components/responses/Accepted" }

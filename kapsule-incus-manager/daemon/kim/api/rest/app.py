@@ -26,6 +26,10 @@ from . import (
     operations,
     events,
     provisioning,
+    provisioning_generic,
+    provisioning_waydroid,
+    provisioning_macos,
+    provisioning_windows,
 )
 
 _WEB_DIST = pathlib.Path(__file__).parents[5] / "ui-web" / "dist"
@@ -52,17 +56,21 @@ def build_app(incus: IncusClient, bus: EventBus) -> FastAPI:
     app.state.bus = bus
 
     # Register all routers
-    app.include_router(instances.router,    prefix="/api/v1")
-    app.include_router(networks.router,     prefix="/api/v1")
-    app.include_router(storage.router,      prefix="/api/v1")
-    app.include_router(images.router,       prefix="/api/v1")
-    app.include_router(profiles.router,     prefix="/api/v1")
-    app.include_router(projects.router,     prefix="/api/v1")
-    app.include_router(cluster.router,      prefix="/api/v1")
-    app.include_router(remotes.router,      prefix="/api/v1")
-    app.include_router(operations.router,   prefix="/api/v1")
-    app.include_router(events.router,       prefix="/api/v1")
-    app.include_router(provisioning.router, prefix="/api/v1")
+    app.include_router(instances.router,              prefix="/api/v1")
+    app.include_router(networks.router,               prefix="/api/v1")
+    app.include_router(storage.router,                prefix="/api/v1")
+    app.include_router(images.router,                 prefix="/api/v1")
+    app.include_router(profiles.router,               prefix="/api/v1")
+    app.include_router(projects.router,               prefix="/api/v1")
+    app.include_router(cluster.router,                prefix="/api/v1")
+    app.include_router(remotes.router,                prefix="/api/v1")
+    app.include_router(operations.router,             prefix="/api/v1")
+    app.include_router(events.router,                 prefix="/api/v1")
+    app.include_router(provisioning.router,           prefix="/api/v1")
+    app.include_router(provisioning_generic.router,   prefix="/api/v1")
+    app.include_router(provisioning_waydroid.router,  prefix="/api/v1")
+    app.include_router(provisioning_macos.router,     prefix="/api/v1")
+    app.include_router(provisioning_windows.router,   prefix="/api/v1")
 
     # Serve the web UI from the built dist directory (production)
     if _WEB_DIST.exists():
