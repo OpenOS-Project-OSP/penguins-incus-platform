@@ -17,7 +17,7 @@ Covers the full incusbox lifecycle:
 from __future__ import annotations
 
 import textwrap
-from typing import Any
+from typing import Any, cast
 
 from ._base import (
     base_instance_config,
@@ -106,7 +106,7 @@ async def create_container(incus: Any, config: dict[str, Any]) -> dict[str, Any]
         disk_size=disk_size,
         project=project,
     )
-    return await incus.create_instance(payload)
+    return cast(dict[str, Any], await incus.create_instance(payload))
 
 
 # ── Assemble (post-create package + hook runner) ──────────────────────────────
@@ -160,24 +160,24 @@ async def assemble_container(incus: Any, name: str,
 
 async def list_snapshots(incus: Any, name: str,
                          project: str = "") -> list[dict[str, Any]]:
-    return await incus.list_snapshots(name, project=project)
+    return cast(list[dict[str, Any]], await incus.list_snapshots(name, project=project))
 
 
 async def create_snapshot(incus: Any, name: str, snapshot: str,
                            stateful: bool = False,
                            project: str = "") -> dict[str, Any]:
-    return await incus.create_snapshot(name, snapshot, stateful=stateful,
-                                       project=project)
+    return cast(dict[str, Any], await incus.create_snapshot(name, snapshot, stateful=stateful,
+                                       project=project))
 
 
 async def restore_snapshot(incus: Any, name: str, snapshot: str,
                             project: str = "") -> dict[str, Any]:
-    return await incus.restore_snapshot(name, snapshot, project=project)
+    return cast(dict[str, Any], await incus.restore_snapshot(name, snapshot, project=project))
 
 
 async def delete_snapshot(incus: Any, name: str, snapshot: str,
                            project: str = "") -> dict[str, Any]:
-    return await incus.delete_snapshot(name, snapshot, project=project)
+    return cast(dict[str, Any], await incus.delete_snapshot(name, snapshot, project=project))
 
 
 async def set_snapshot_schedule(incus: Any, name: str, schedule: str,
@@ -188,16 +188,16 @@ async def set_snapshot_schedule(incus: Any, name: str, schedule: str,
     cfg: dict[str, str] = dict(inst.get("config", {}))
     cfg.update(snapshot_schedule_config(schedule, expiry))
     params = {"project": project} if project else {}
-    return await incus.put(
+    return cast(dict[str, Any], await incus.put(
         f"/1.0/instances/{name}",
         json={**inst, "config": cfg},
         params=params,
-    )
+    ))
 
 
 async def disable_snapshot_schedule(incus: Any, name: str,
                                      project: str = "") -> dict[str, Any]:
-    return await set_snapshot_schedule(incus, name, "", project=project)
+    return cast(dict[str, Any], await set_snapshot_schedule(incus, name, "", project=project))
 
 
 # ── GPU management ────────────────────────────────────────────────────────────
@@ -222,13 +222,13 @@ async def attach_gpu(incus: Any, name: str, config: dict[str, Any]) -> dict[str,
         vendor=config.get("vendor", ""),
         gid=config.get("gid", 44),
     )
-    return await incus.add_device(name, dev_name, device,
-                                   project=config.get("project", ""))
+    return cast(dict[str, Any], await incus.add_device(name, dev_name, device,
+                                   project=config.get("project", "")))
 
 
 async def detach_gpu(incus: Any, name: str, dev_name: str,
                      project: str = "") -> dict[str, Any]:
-    return await incus.remove_device(name, dev_name, project=project)
+    return cast(dict[str, Any], await incus.remove_device(name, dev_name, project=project))
 
 
 # ── USB management ────────────────────────────────────────────────────────────
@@ -251,13 +251,13 @@ async def attach_usb(incus: Any, name: str, config: dict[str, Any]) -> dict[str,
         product_id=config["product_id"],
         dev_name=dev_name,
     )
-    return await incus.add_device(name, dev_name, device,
-                                   project=config.get("project", ""))
+    return cast(dict[str, Any], await incus.add_device(name, dev_name, device,
+                                   project=config.get("project", "")))
 
 
 async def detach_usb(incus: Any, name: str, dev_name: str,
                      project: str = "") -> dict[str, Any]:
-    return await incus.remove_device(name, dev_name, project=project)
+    return cast(dict[str, Any], await incus.remove_device(name, dev_name, project=project))
 
 
 # ── Network port forwarding ───────────────────────────────────────────────────
@@ -276,13 +276,13 @@ async def add_forward(incus: Any, name: str, config: dict[str, Any]) -> dict[str
         protocol=config.get("protocol", "tcp"),
         listen_addr=config.get("listen_addr", "127.0.0.1"),
     )
-    return await incus.add_device(name, dev_name, device,
-                                   project=config.get("project", ""))
+    return cast(dict[str, Any], await incus.add_device(name, dev_name, device,
+                                   project=config.get("project", "")))
 
 
 async def remove_forward(incus: Any, name: str, dev_name: str,
                           project: str = "") -> dict[str, Any]:
-    return await incus.remove_device(name, dev_name, project=project)
+    return cast(dict[str, Any], await incus.remove_device(name, dev_name, project=project))
 
 
 # ── Fleet operations ──────────────────────────────────────────────────────────
@@ -332,4 +332,4 @@ async def publish_container(incus: Any, config: dict[str, Any]) -> dict[str, Any
         "properties": {"description": description},
         "public": config.get("public", False),
     }
-    return await incus.post("/1.0/images", json=payload)
+    return cast(dict[str, Any], await incus.post("/1.0/images", json=payload))
