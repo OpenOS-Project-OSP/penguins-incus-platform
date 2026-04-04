@@ -1,23 +1,23 @@
-# Kapsule-Incus-Manager — Architecture
+# Penguins-Incus-Platform — Architecture
 
 ## Overview
 
-Kapsule-Incus-Manager is a unified Incus container and VM management platform
+Penguins-Incus-Platform is a unified Incus container and VM management platform
 consisting of three first-class frontends (QML desktop UI, web UI, CLI) backed
 by a single daemon. All frontends have full feature parity — every operation
 available in one is available in all others.
 
-KIM is also the central control plane for four guest-type toolkits that were
+PIP is also the central control plane for four guest-type toolkits that were
 previously maintained as separate projects. Their provisioning logic now runs
-inside `kim-daemon` as plugins, exposed through the same REST/D-Bus API used
+inside `penguins-incus-daemon` as plugins, exposed through the same REST/D-Bus API used
 by the GUI frontends:
 
 | Source project | Guest type | Daemon plugin | CLI entry point |
 |---|---|---|---|
-| incusbox | Generic Linux containers | `provisioning/generic.py` | `kim provision generic` |
-| waydroid-toolkit | Waydroid (Android) containers | `provisioning/waydroid.py` | `kim provision waydroid` |
-| Incus-MacOS-Toolkit | macOS KVM VMs | `provisioning/macos.py` | `kim provision macos` |
-| incus-windows-toolkit | Windows VMs | `provisioning/windows.py` | `kim provision windows` |
+| incusbox | Generic Linux containers | `provisioning/generic.py` | `penguins-incus provision generic` |
+| waydroid-toolkit | Waydroid (Android) containers | `provisioning/waydroid.py` | `penguins-incus provision waydroid` |
+| Incus-MacOS-Toolkit | macOS KVM VMs | `provisioning/macos.py` | `penguins-incus provision macos` |
+| incus-windows-toolkit | Windows VMs | `provisioning/windows.py` | `penguins-incus provision windows` |
 
 ## Design Principles
 
@@ -45,7 +45,7 @@ by the GUI frontends:
 ## Repository Structure
 
 ```
-kapsule-incus-manager/
+penguins-incus-platform/
 │
 ├── ARCHITECTURE.md               this document
 │
@@ -57,7 +57,7 @@ kapsule-incus-manager/
 │
 ├── daemon/                       Python — system daemon
 │   ├── pyproject.toml
-│   ├── kim/
+│   ├── penguins_incus/
 │   │   ├── main.py               entry point, service wiring
 │   │   ├── incus/                Incus REST API client (multi-remote, exec, file push)
 │   │   ├── api/
@@ -77,12 +77,12 @@ kapsule-incus-manager/
 │   │   ├── profiles/             bundled Incus profile library loader
 │   │   └── events.py             Incus event subscriber + fan-out
 │   └── data/
-│       ├── kim.service           systemd unit
-│       └── kim.socket            systemd socket activation
+│       ├── penguins-incus.service           systemd unit
+│       └── penguins-incus.socket            systemd socket activation
 │
 ├── ui-qml/                       C++/QML — primary desktop UI
 │   ├── CMakeLists.txt
-│   ├── lib/                      libkim-qt — D-Bus client library (LGPL-2.1)
+│   ├── lib/                      libpenguins-incus-qt — D-Bus client library (LGPL-2.1)
 │   │   ├── CMakeLists.txt
 │   │   └── src/
 │   └── app/                      QML application
@@ -96,7 +96,7 @@ kapsule-incus-manager/
 │
 ├── cli/                          Python — CLI (thin client over daemon HTTP)
 │   ├── pyproject.toml
-│   └── kim/
+│   └── penguins_incus/
 │       └── cli/
 │           ├── main.py               Click-based CLI, generated from OpenAPI schema
 │           ├── provision_generic.py  incusbox CLI subcommands
@@ -123,7 +123,7 @@ kapsule-incus-manager/
 
 ## Component Responsibilities
 
-### daemon (`kim`)
+### daemon (`penguins-incus`)
 
 The daemon is a Python process managed by systemd. It:
 
@@ -131,7 +131,7 @@ The daemon is a Python process managed by systemd. It:
   (`/var/lib/incus/unix.socket` or via HTTPS for remote servers)
 - Subscribes to the Incus event stream and fans out to all connected clients
   via D-Bus signals and HTTP SSE/WebSocket
-- Exposes the full KIM API over:
+- Exposes the full PIP API over:
   - **HTTP REST + WebSocket** on `127.0.0.1:8765` (configurable)
   - **D-Bus** on the session or system bus at `org.KapsuleIncusManager`
 - Handles all provisioning logic (app containers, Compose deployment, VLAN
@@ -148,7 +148,7 @@ The daemon is a Python process managed by systemd. It:
 ### ui-qml
 
 A Qt6/QML application that communicates with the daemon exclusively over D-Bus.
-It uses `libkim-qt` (LGPL-2.1) as the D-Bus client library, which can also be
+It uses `libpenguins-incus-qt` (LGPL-2.1) as the D-Bus client library, which can also be
 used by third-party applications.
 
 The QML UI is the primary desktop experience. It integrates with KDE Plasma
@@ -161,7 +161,7 @@ via an embedded terminal widget.
 ### ui-web
 
 The web UI is the React/TypeScript application from `incus-ui-canonical`,
-adapted to talk to the KIM daemon REST API instead of directly to Incus. It is
+adapted to talk to the PIP daemon REST API instead of directly to Incus. It is
 served as static assets by the daemon's HTTP server.
 
 The web UI is the primary interface for remote/headless server management and
@@ -217,7 +217,7 @@ The daemon subscribes to the Incus event stream once and fans out to clients:
 - **WebSocket**: `/api/v1/events/ws` — alternative for clients that prefer WS
 
 All three receive the same event payloads, normalized from the raw Incus event
-format into the KIM event schema.
+format into the PIP event schema.
 
 ### Terminal / console access
 
@@ -271,8 +271,8 @@ are in scope:
 
 | Project | Role | What is taken |
 |---|---|---|
-| KDE/kapsule | Core architecture | Daemon structure, `libkapsule-qt`, CLI patterns, D-Bus interface design |
-| incus-ui-canonical | Web UI | React/TS app, adapted to KIM REST API |
+| KDE/kapsule | Core architecture | Daemon structure, `libpenguins-incus-qt`, CLI patterns, D-Bus interface design |
+| incus-ui-canonical | Web UI | React/TS app, adapted to PIP REST API |
 | incus_container_manager | Reference | UX patterns and feature checklist for QML UI |
 | incus_container_gui_setup | Assets | Incus profile YAML files, setup documentation |
 | incus-app-container | Logic | App container provisioning, VLAN management, config schema |
@@ -286,12 +286,12 @@ are in scope:
 ### Provisioning plugin architecture
 
 Each merged toolkit becomes a **provisioning plugin** — a Python module under
-`daemon/kim/provisioning/` with a matching REST router under
-`daemon/kim/api/rest/`. The plugin pattern follows the existing `compose.py`
+`daemon/penguins_incus/provisioning/` with a matching REST router under
+`daemon/penguins_incus/api/rest/`. The plugin pattern follows the existing `compose.py`
 plugin.
 
 ```
-daemon/kim/provisioning/
+daemon/penguins_incus/provisioning/
   _base.py      shared helpers: cloud-init builder, device config builders
   compose.py    Docker Compose → Incus (existing)
   generic.py    incusbox: container create/assemble/gpu/usb/net/snapshot/fleet
@@ -321,7 +321,7 @@ require host-side downloads use a temporary helper container.
 | Component | License |
 |---|---|
 | daemon | GPL-3.0-or-later |
-| libkim-qt | LGPL-2.1-or-later |
+| libpenguins-incus-qt | LGPL-2.1-or-later |
 | cli | GPL-3.0-or-later |
 | ui-web | Apache-2.0 |
 | ui-qml app | GPL-3.0-or-later |
@@ -336,8 +336,8 @@ require host-side downloads use a temporary helper container.
 - Managing non-Incus container runtimes (Docker, Podman) directly — only via
   app containers running inside Incus
 - A mobile UI
-- Replacing the `incus` CLI for scripting — the KIM CLI is a management
+- Replacing the `incus` CLI for scripting — the PIP CLI is a management
   companion, not a replacement for the upstream tool
 - Maintaining the four source toolkits (incusbox, waydroid-toolkit,
-  Incus-MacOS-Toolkit, incus-windows-toolkit) as independent projects — KIM is
+  Incus-MacOS-Toolkit, incus-windows-toolkit) as independent projects — PIP is
   now the canonical location for all of their functionality

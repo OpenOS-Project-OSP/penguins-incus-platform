@@ -4,30 +4,30 @@ Unified [Incus](https://linuxcontainers.org/incus/) container and VM management
 with full feature parity across three frontends: a Qt6/QML desktop app, a React
 web UI, and a CLI.
 
-KIM is the central control plane for all Incus guest types — generic Linux
+PIP is the central control plane for all Incus guest types — generic Linux
 containers, Waydroid (Android) containers, macOS KVM VMs, and Windows VMs.
 Four previously independent toolkits have been merged into the daemon as
 provisioning plugins:
 
 | Source project | Guest type | CLI entry point |
 |---|---|---|
-| [incusbox](https://github.com/Interested-Deving-1896/incusbox) | Generic Linux containers | `kim provision generic` |
-| [waydroid-toolkit](https://github.com/Interested-Deving-1896/waydroid-toolkit) | Waydroid (Android) containers | `kim provision waydroid` |
-| [Incus-MacOS-Toolkit](https://github.com/Interested-Deving-1896/Incus-MacOS-Toolkit) | macOS KVM VMs | `kim provision macos` |
-| [incus-windows-toolkit](https://github.com/Interested-Deving-1896/incus-windows-toolkit) | Windows VMs | `kim provision windows` |
+| [incusbox](https://github.com/Interested-Deving-1896/incusbox) | Generic Linux containers | `penguins-incus provision generic` |
+| [waydroid-toolkit](https://github.com/Interested-Deving-1896/waydroid-toolkit) | Waydroid (Android) containers | `penguins-incus provision waydroid` |
+| [Incus-MacOS-Toolkit](https://github.com/Interested-Deving-1896/Incus-MacOS-Toolkit) | macOS KVM VMs | `penguins-incus provision macos` |
+| [incus-windows-toolkit](https://github.com/Interested-Deving-1896/incus-windows-toolkit) | Windows VMs | `penguins-incus provision windows` |
 
 ## Architecture
 
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                     Frontends                           │
-│  Qt6/QML desktop app  │  React web UI  │  kim CLI       │
+│  Qt6/QML desktop app  │  React web UI  │  penguins-incus CLI       │
 └──────────┬────────────┴───────┬────────┴────────┬───────┘
            │ D-Bus              │ HTTP/WS/SSE      │ HTTP
            └──────────┬─────────┘                 │
                       ▼                            │
            ┌──────────────────────┐                │
-           │    kim-daemon        │◄───────────────┘
+           │    penguins-incus-daemon        │◄───────────────┘
            │  (FastAPI + dasbus)  │
            │                      │
            │  provisioning/       │
@@ -52,10 +52,10 @@ available in the GUI is also available in the CLI and REST API.
 
 ```
 ├── ARCHITECTURE.md                    # Design decisions and component boundaries
-├── kapsule-incus-manager/
+├── penguins-incus-platform/
 │   ├── api/schema/                    # OpenAPI schema (143 operations) + D-Bus XML
 │   ├── daemon/
-│   │   └── kim/
+│   │   └── penguins_incus/
 │   │       ├── provisioning/          # Guest-type provisioning plugins
 │   │       │   ├── generic.py         # incusbox feature set
 │   │       │   ├── waydroid.py        # waydroid-toolkit feature set
@@ -69,50 +69,50 @@ available in the GUI is also available in the CLI and REST API.
 │   │   ├── windows/                   # Windows VM profiles + GPU overlays
 │   │   └── waydroid/                  # Waydroid container profile
 │   ├── ui-web/                        # React/TypeScript web UI (Vite)
-│   └── ui-qml/                        # Qt6/QML desktop UI + libkim-qt
+│   └── ui-qml/                        # Qt6/QML desktop UI + libpenguins-incus-qt
 ```
 
-Full documentation is in [`kapsule-incus-manager/README.md`](kapsule-incus-manager/README.md).
+Full documentation is in [`penguins-incus-platform/README.md`](penguins-incus-platform/README.md).
 
 ## Quick start
 
 ### Daemon
 
 ```bash
-cd kapsule-incus-manager/daemon
+cd penguins-incus-platform/daemon
 pip install -e ".[dev]"
-kim-daemon
+penguins-incus-daemon
 ```
 
 ### CLI
 
 ```bash
-cd kapsule-incus-manager/cli
+cd penguins-incus-platform/cli
 pip install -e ".[dev]"
 
 # Generic containers (incusbox)
-kim provision generic create mybox --image images:ubuntu/24.04/cloud
+penguins-incus provision generic create mybox --image images:ubuntu/24.04/cloud
 
 # Waydroid (Android) container
-kim provision waydroid create my-android --image-type GAPPS
+penguins-incus provision waydroid create my-android --image-type GAPPS
 
 # macOS VM
-kim provision macos image firmware
-kim provision macos image fetch --version sonoma
-kim provision macos create my-mac --version sonoma
+penguins-incus provision macos image firmware
+penguins-incus provision macos image fetch --version sonoma
+penguins-incus provision macos create my-mac --version sonoma
 
 # Windows VM
-kim provision windows create my-win --image /path/to/win11.iso
+penguins-incus provision windows create my-win --image /path/to/win11.iso
 
 # Standard instance management
-kim container list
-kim vm list
+penguins-incus container list
+penguins-incus vm list
 ```
 
 ### Web UI
 
 ```bash
-cd kapsule-incus-manager/ui-web
+cd penguins-incus-platform/ui-web
 npm install && npm run dev
 # Open http://localhost:5173
 ```
@@ -120,9 +120,9 @@ npm install && npm run dev
 ### QML desktop app
 
 ```bash
-cmake -B build -S kapsule-incus-manager/ui-qml -G Ninja
+cmake -B build -S penguins-incus-platform/ui-qml -G Ninja
 cmake --build build
-./build/kim-app
+./build/penguins-incus-app
 ```
 
 ## Prerequisites
@@ -138,4 +138,4 @@ cmake --build build
 ## License
 
 - Daemon, CLI, web UI: GPL-3.0-or-later
-- `libkim-qt`: LGPL-2.1-or-later
+- `libpenguins-incus-qt`: LGPL-2.1-or-later
