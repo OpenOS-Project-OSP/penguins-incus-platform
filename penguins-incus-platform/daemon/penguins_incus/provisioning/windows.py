@@ -178,7 +178,10 @@ async def backup_vm(incus: Any, name: str,
 async def list_backups(incus: Any, name: str,
                         project: str = "") -> list[dict[str, Any]]:
     params = {"project": project} if project else {}
-    return cast(list[dict[str, Any]], await incus.get(f"/1.0/instances/{name}/backups", params=params))
+    return cast(
+        list[dict[str, Any]],
+        await incus.get(f"/1.0/instances/{name}/backups", params=params),
+    )
 
 
 async def restore_vm_backup(incus: Any, name: str, backup_name: str,
