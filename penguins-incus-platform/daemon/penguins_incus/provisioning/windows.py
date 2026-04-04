@@ -413,7 +413,7 @@ async def fleet_list(incus: Any, project: str = "",
 async def fleet_start(incus: Any, names: list[str],
                        project: str = "") -> list[dict[str, Any]]:
     tasks = [start_windows_vm(incus, n, project=project) for n in names]
-    return list(await asyncio.gather(*tasks, return_exceptions=True)  # type: ignore[misc])
+    return list(await asyncio.gather(*tasks, return_exceptions=True))  # type: ignore[misc]
 
 
 async def fleet_stop(incus: Any, names: list[str],
