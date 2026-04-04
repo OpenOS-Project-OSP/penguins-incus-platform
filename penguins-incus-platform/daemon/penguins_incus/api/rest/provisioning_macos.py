@@ -11,7 +11,7 @@ from ...provisioning import macos as m
 router = APIRouter(tags=["provisioning/macos"])
 
 
-def _incus(req: Request) -> Any:  # type: ignore[return]
+def _incus(req: Request) -> Any:
     return req.app.state.incus
 
 
