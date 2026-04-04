@@ -11,7 +11,7 @@ import asyncio
 import json
 import logging
 from collections.abc import AsyncIterator
-from typing import Any
+from typing import Any, cast
 
 import httpx
 
@@ -156,14 +156,14 @@ class IncusClient:
             params["project"] = project
         if type_filter:
             params["type"] = type_filter
-        return await conn.request("GET", "/1.0/instances", params=params)  # type: ignore[return-value]
+        return cast(Any, await conn.request("GET", "/1.0/instances", params=params))
 
     async def get_instance(self, name: str, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.get(f"/1.0/instances/{name}", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/instances/{name}", params=params))
 
     async def create_instance(self, config: dict[str, Any]) -> dict[str, Any]:
-        return await self.post("/1.0/instances", json=config)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post("/1.0/instances", json=config))
 
     async def delete_instance(self, name: str, project: str = "",
                                force: bool = False) -> dict[str, Any]:
@@ -172,26 +172,26 @@ class IncusClient:
             params["project"] = project
         if force:
             params["force"] = "1"
-        return await self.delete(f"/1.0/instances/{name}", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/instances/{name}", params=params))
 
     async def change_instance_state(self, name: str, action: str,
                                      force: bool = False, timeout: int = 30,
                                      project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.put(  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.put(
             f"/1.0/instances/{name}/state",
             json={"action": action, "force": force, "timeout": timeout},
             params=params,
-        )
+        ))
 
     async def rename_instance(self, name: str, new_name: str,
                                project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.post(  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post(
             f"/1.0/instances/{name}",
             json={"name": new_name},
             params=params,
-        )
+        ))
 
     async def get_instance_logs(self, name: str, project: str = "") -> str:
         params = {"project": project} if project else {}
@@ -204,31 +204,31 @@ class IncusClient:
         params: dict[str, str] = {"recursion": "1"}
         if project:
             params["project"] = project
-        return await self.get(f"/1.0/instances/{name}/snapshots", params=params)  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get(f"/1.0/instances/{name}/snapshots", params=params))
 
     async def create_snapshot(self, name: str, snapshot: str,
                                stateful: bool = False, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.post(  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.post(
             f"/1.0/instances/{name}/snapshots",
             json={"name": snapshot, "stateful": stateful},
             params=params,
-        )
+        ))
 
     async def restore_snapshot(self, name: str, snapshot: str,
                                 project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.post(  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.post(
             f"/1.0/instances/{name}/snapshots/{snapshot}",
             json={"restore": snapshot}, params=params,
-        )
+        ))
 
     async def delete_snapshot(self, name: str, snapshot: str,
                                project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.delete(  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.delete(
             f"/1.0/instances/{name}/snapshots/{snapshot}", params=params
-        )
+        ))
 
     # ── Networks ──────────────────────────────────────────────────────────
 
@@ -236,14 +236,14 @@ class IncusClient:
         params: dict[str, str] = {"recursion": "1"}
         if project:
             params["project"] = project
-        return await self.get("/1.0/networks", params=params)  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/networks", params=params))
 
     async def create_network(self, config: dict[str, Any]) -> dict[str, Any]:
-        return await self.post("/1.0/networks", json=config)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post("/1.0/networks", json=config))
 
     async def get_network(self, name: str, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.get(f"/1.0/networks/{name}", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/networks/{name}", params=params))
 
     async def update_network(self, name: str, config: dict[str, Any],
                               project: str = "") -> None:
@@ -252,47 +252,47 @@ class IncusClient:
 
     async def delete_network(self, name: str, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.delete(f"/1.0/networks/{name}", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/networks/{name}", params=params))
 
     # ── Storage ───────────────────────────────────────────────────────────
 
     async def list_storage_pools(self) -> list[dict[str, Any]]:
-        return await self.get("/1.0/storage-pools", params={"recursion": "1"})  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/storage-pools", params={"recursion": "1"}))
 
     async def create_storage_pool(self, config: dict[str, Any]) -> dict[str, Any]:
-        return await self.post("/1.0/storage-pools", json=config)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post("/1.0/storage-pools", json=config))
 
     async def get_storage_pool(self, name: str) -> dict[str, Any]:
-        return await self.get(f"/1.0/storage-pools/{name}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/storage-pools/{name}"))
 
     async def update_storage_pool(self, name: str, config: dict[str, Any]) -> None:
         await self.put(f"/1.0/storage-pools/{name}", json=config)
 
     async def delete_storage_pool(self, name: str) -> dict[str, Any]:
-        return await self.delete(f"/1.0/storage-pools/{name}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/storage-pools/{name}"))
 
     async def list_storage_volumes(self, pool: str,
                                     project: str = "") -> list[dict[str, Any]]:
         params: dict[str, str] = {"recursion": "1"}
         if project:
             params["project"] = project
-        return await self.get(f"/1.0/storage-pools/{pool}/volumes", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/storage-pools/{pool}/volumes", params=params))
 
     async def create_storage_volume(self, pool: str,
                                      config: dict[str, Any]) -> dict[str, Any]:
-        return await self.post(f"/1.0/storage-pools/{pool}/volumes", json=config)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post(f"/1.0/storage-pools/{pool}/volumes", json=config))
 
     async def delete_storage_volume(self, pool: str, name: str,
                                      project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.delete(  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(
             f"/1.0/storage-pools/{pool}/volumes/custom/{name}", params=params
-        )
+        ))
 
     # ── Images ────────────────────────────────────────────────────────────
 
     async def list_images(self) -> list[dict[str, Any]]:
-        return await self.get("/1.0/images", params={"recursion": "1"})  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/images", params={"recursion": "1"}))
 
     async def pull_image(self, remote: str, image: str,
                           alias: str = "") -> dict[str, Any]:
@@ -301,13 +301,13 @@ class IncusClient:
         }
         if alias:
             payload["aliases"] = [{"name": alias}]
-        return await self.post("/1.0/images", json=payload)  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.post("/1.0/images", json=payload))
 
     async def get_image(self, fingerprint: str) -> dict[str, Any]:
-        return await self.get(f"/1.0/images/{fingerprint}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/images/{fingerprint}"))
 
     async def delete_image(self, fingerprint: str) -> dict[str, Any]:
-        return await self.delete(f"/1.0/images/{fingerprint}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/images/{fingerprint}"))
 
     # ── Profiles ──────────────────────────────────────────────────────────
 
@@ -315,14 +315,14 @@ class IncusClient:
         params: dict[str, str] = {"recursion": "1"}
         if project:
             params["project"] = project
-        return await self.get("/1.0/profiles", params=params)  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/profiles", params=params))
 
     async def create_profile(self, config: dict[str, Any]) -> dict[str, Any]:
-        return await self.post("/1.0/profiles", json=config)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post("/1.0/profiles", json=config))
 
     async def get_profile(self, name: str, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.get(f"/1.0/profiles/{name}", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/profiles/{name}", params=params))
 
     async def update_profile(self, name: str, config: dict[str, Any],
                               project: str = "") -> None:
@@ -331,51 +331,51 @@ class IncusClient:
 
     async def delete_profile(self, name: str, project: str = "") -> dict[str, Any]:
         params = {"project": project} if project else {}
-        return await self.delete(f"/1.0/profiles/{name}", params=params)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/profiles/{name}", params=params))
 
     # ── Projects ──────────────────────────────────────────────────────────
 
     async def list_projects(self) -> list[dict[str, Any]]:
-        return await self.get("/1.0/projects", params={"recursion": "1"})  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/projects", params={"recursion": "1"}))
 
     async def create_project(self, config: dict[str, Any]) -> dict[str, Any]:
-        return await self.post("/1.0/projects", json=config)  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post("/1.0/projects", json=config))
 
     async def get_project(self, name: str) -> dict[str, Any]:
-        return await self.get(f"/1.0/projects/{name}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/projects/{name}"))
 
     async def update_project(self, name: str, config: dict[str, Any]) -> None:
         await self.put(f"/1.0/projects/{name}", json=config)
 
     async def delete_project(self, name: str) -> dict[str, Any]:
-        return await self.delete(f"/1.0/projects/{name}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/projects/{name}"))
 
     # ── Cluster ───────────────────────────────────────────────────────────
 
     async def list_cluster_members(self) -> list[dict[str, Any]]:
-        return await self.get("/1.0/cluster/members", params={"recursion": "1"})  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/cluster/members", params={"recursion": "1"}))
 
     async def get_cluster_member(self, name: str) -> dict[str, Any]:
-        return await self.get(f"/1.0/cluster/members/{name}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/cluster/members/{name}"))
 
     async def delete_cluster_member(self, name: str) -> dict[str, Any]:
-        return await self.delete(f"/1.0/cluster/members/{name}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.delete(f"/1.0/cluster/members/{name}"))
 
     async def evacuate_cluster_member(self, name: str) -> dict[str, Any]:
-        return await self.post(f"/1.0/cluster/members/{name}/state",  # type: ignore[return-value]
-                               json={"action": "evacuate"})
+        return cast(dict[str, Any], await self.post(f"/1.0/cluster/members/{name}/state",
+                               json={"action": "evacuate"}))
 
     async def restore_cluster_member(self, name: str) -> dict[str, Any]:
-        return await self.post(f"/1.0/cluster/members/{name}/state",  # type: ignore[return-value]
-                               json={"action": "restore"})
+        return cast(dict[str, Any], await self.post(f"/1.0/cluster/members/{name}/state",
+                               json={"action": "restore"}))
 
     # ── Operations ────────────────────────────────────────────────────────
 
     async def list_operations(self) -> list[dict[str, Any]]:
-        return await self.get("/1.0/operations", params={"recursion": "1"})  # type: ignore[return-value]
+        return cast(list[dict[str, Any]], await self.get("/1.0/operations", params={"recursion": "1"}))
 
     async def get_operation(self, op_id: str) -> dict[str, Any]:
-        return await self.get(f"/1.0/operations/{op_id}")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get(f"/1.0/operations/{op_id}"))
 
     async def cancel_operation(self, op_id: str) -> None:
         await self.delete(f"/1.0/operations/{op_id}")
@@ -394,7 +394,7 @@ class IncusClient:
 
     async def get_host_resources(self) -> dict[str, Any]:
         """Return host hardware resources (CPU, memory, GPU, USB, storage)."""
-        return await self.get("/1.0/resources")  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.get("/1.0/resources"))
 
     # ── Instance devices ──────────────────────────────────────────────────
 
@@ -410,11 +410,11 @@ class IncusClient:
         devices: dict[str, Any] = dict(inst.get("devices", {}))
         devices[device_name] = config
         params = {"project": project} if project else {}
-        return await self.put(  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.put(
             f"/1.0/instances/{name}",
             json={**inst, "devices": devices},
             params=params,
-        )
+        ))
 
     async def remove_device(self, name: str, device_name: str,
                              project: str = "") -> dict[str, Any]:
@@ -423,11 +423,11 @@ class IncusClient:
         devices: dict[str, Any] = dict(inst.get("devices", {}))
         devices.pop(device_name, None)
         params = {"project": project} if project else {}
-        return await self.put(  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.put(
             f"/1.0/instances/{name}",
             json={**inst, "devices": devices},
             params=params,
-        )
+        ))
 
     # ── Instance exec ─────────────────────────────────────────────────────
 
@@ -452,11 +452,11 @@ class IncusClient:
             "interactive": interactive,
             "environment": environment or {},
         }
-        return await self.post(  # type: ignore[return-value]
+        return cast(dict[str, Any], await self.post(
             f"/1.0/instances/{name}/exec",
             json=payload,
             params=params,
-        )
+        ))
 
     # ── File push / pull ──────────────────────────────────────────────────
 
