@@ -10,7 +10,7 @@ from __future__ import annotations
 import textwrap
 from typing import Any, cast
 
-import yaml  # type: ignore[import-untyped]
+import yaml
 
 
 async def deploy_compose(incus: Any, config: dict[str, Any]) -> dict[str, Any]:
@@ -48,7 +48,7 @@ async def deploy_compose(incus: Any, config: dict[str, Any]) -> dict[str, Any]:
             "ipv4.address": config["ip"],
         }
 
-    return await incus.create_instance(instance_config)
+    return cast(dict[str, Any], await incus.create_instance(instance_config))
 
 
 def _build_cloud_init(name: str, compose_src: str) -> str:
@@ -106,7 +106,7 @@ def convert_compose(compose_yaml: str) -> dict[str, Any]:
       - environment → container config keys
     """
     try:
-        doc = cast(dict[str, object], yaml.safe_load(compose_yaml))
+        doc = cast(dict[str, Any], yaml.safe_load(compose_yaml))
     except yaml.YAMLError as exc:
         return {"error": str(exc)}
 
