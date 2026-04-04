@@ -11,7 +11,7 @@ from ...provisioning import windows as win
 router = APIRouter(tags=["provisioning/windows"])
 
 
-def _incus(req: Request) -> Any:  # type: ignore[return]
+def _incus(req: Request) -> Any:
     return req.app.state.incus
 
 
