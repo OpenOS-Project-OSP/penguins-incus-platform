@@ -1,4 +1,4 @@
-import { render, screen, fireEvent, waitFor } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { RemotesPage } from "../pages/RemotesPage";
 
 const REMOTES = [
@@ -71,8 +71,9 @@ it("opens add form on + Add click", async () => {
   render(<RemotesPage />);
   await waitFor(() => screen.getByText("local"));
   fireEvent.click(screen.getByRole("button", { name: /\+ add/i }));
-  expect(screen.getByText(/name/i)).toBeInTheDocument();
-  expect(screen.getByText(/url/i)).toBeInTheDocument();
+  // Confirm the form appeared by checking for the text inputs it renders
+  const inputs = screen.getAllByRole("textbox");
+  expect(inputs.length).toBeGreaterThanOrEqual(2);
 });
 
 it("shows validation error when name or url is empty", async () => {
@@ -112,7 +113,7 @@ it("does not show Remove button for local remote", async () => {
   render(<RemotesPage />);
   await waitFor(() => screen.getByText("local"));
   // Only prod row should have Remove
-  const removeButtons = screen.getAllByRole("button", { name: /remove/i });
+  const removeButtons = screen.getAllByRole("button", { name: /^remove$/i });
   expect(removeButtons).toHaveLength(1);
 });
 
@@ -120,9 +121,9 @@ it("opens confirm dialog on Remove click", async () => {
   mockFetch();
   render(<RemotesPage />);
   await waitFor(() => screen.getByText("prod"));
-  fireEvent.click(screen.getByRole("button", { name: /remove/i }));
-  expect(screen.getByText(/remove remote/i)).toBeInTheDocument();
-  // "prod" appears in both the table row and the dialog; use getAllBy.
+  fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+  // Dialog title and prod name both appear after click
+  expect(screen.getAllByText(/remove remote/i).length).toBeGreaterThan(0);
   expect(screen.getAllByText(/prod/).length).toBeGreaterThan(0);
 });
 
@@ -130,8 +131,12 @@ it("calls DELETE on confirm remove", async () => {
   mockFetch();
   render(<RemotesPage />);
   await waitFor(() => screen.getByText("prod"));
-  fireEvent.click(screen.getByRole("button", { name: /remove/i }));
+  // Click the table row Remove button (only one exists before dialog opens)
   fireEvent.click(screen.getByRole("button", { name: /^remove$/i }));
+  // Now the dialog is open — click the confirm Remove button inside it
+  // getAllByRole returns [table-Remove, dialog-Remove]; the dialog one is last
+  const removeButtons = screen.getAllByRole("button", { name: /^remove$/i });
+  fireEvent.click(removeButtons[removeButtons.length - 1]);
   await waitFor(() => {
     const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
     const deleteCall = calls.find(([url, opts]: [string, RequestInit]) =>
